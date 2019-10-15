@@ -1,19 +1,25 @@
-data "aws_caller_identity" "current" {}
+terraform {
+  required_version = ">= 0.12"
+}
 
-data "aws_region" "current" {}
+data "aws_caller_identity" "current" {
+}
+
+data "aws_region" "current" {
+}
 
 resource "aws_kms_key" "s3_bucket_kms_key" {
   description = "A kms key for encrypting/decrypting S3 bucket ${var.bucket_name} within path ${var.bucket_path}"
-  policy      = "${data.aws_iam_policy_document.kms_key_policy_document.json}"
+  policy      = data.aws_iam_policy_document.kms_key_policy_document.json
 }
 
 resource "aws_kms_alias" "s3_bucket_kms_alias" {
   name          = "alias/${var.kms_alias}"
-  target_key_id = "${aws_kms_key.s3_bucket_kms_key.key_id}"
+  target_key_id = aws_kms_key.s3_bucket_kms_key.key_id
 }
 
 resource "aws_iam_user" "s3_bucket_iam_user" {
-  name = "${var.iam_user}"
+  name = var.iam_user
   path = "/"
 }
 
@@ -48,7 +54,7 @@ data "aws_iam_policy_document" "s3_folder_policy_document" {
     effect = "Allow"
 
     resources = [
-      "${var.bucket_arn}",
+      var.bucket_arn,
     ]
 
     actions = [
@@ -86,7 +92,7 @@ data "aws_iam_policy_document" "s3_folder_policy_document" {
     condition {
       test     = "StringEquals"
       variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
-      values   = ["${aws_kms_key.s3_bucket_kms_key.arn}"]
+      values   = [aws_kms_key.s3_bucket_kms_key.arn]
     }
   }
 
@@ -122,13 +128,13 @@ data "aws_iam_policy_document" "s3_folder_policy_document" {
 }
 
 resource "aws_iam_user_policy_attachment" "attach_s3_folder_iam_policy" {
-  user       = "${aws_iam_user.s3_bucket_iam_user.name}"
-  policy_arn = "${aws_iam_policy.s3_folder_iam_policy.arn}"
+  user       = aws_iam_user.s3_bucket_iam_user.name
+  policy_arn = aws_iam_policy.s3_folder_iam_policy.arn
 }
 
 resource "aws_iam_policy" "s3_folder_iam_policy" {
   name        = "${var.iam_user}-S3FolderIamPolicy"
-  policy      = "${data.aws_iam_policy_document.s3_folder_policy_document.json}"
+  policy      = data.aws_iam_policy_document.s3_folder_policy_document.json
   description = "Policy for bucket and object permissions"
 }
 
@@ -140,7 +146,7 @@ data "aws_iam_policy_document" "s3_folder_kms_policy_document" {
     effect = "Allow"
 
     resources = [
-      "${aws_kms_key.s3_bucket_kms_key.arn}",
+      aws_kms_key.s3_bucket_kms_key.arn,
       "arn:aws:kms:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alias/${var.kms_alias}",
     ]
 
@@ -160,11 +166,11 @@ data "aws_iam_policy_document" "s3_folder_kms_policy_document" {
 
 resource "aws_iam_policy" "s3_folder_kms_iam_policy" {
   name        = "${var.iam_user}-S3FolderKMSIamPolicy"
-  policy      = "${data.aws_iam_policy_document.s3_folder_kms_policy_document.json}"
+  policy      = data.aws_iam_policy_document.s3_folder_kms_policy_document.json
   description = "Policy for kms key permissions"
 }
 
 resource "aws_iam_user_policy_attachment" "attach_s3_bucket_kms_iam_policy" {
-  user       = "${aws_iam_user.s3_bucket_iam_user.name}"
-  policy_arn = "${aws_iam_policy.s3_folder_kms_iam_policy.arn}"
+  user       = aws_iam_user.s3_bucket_iam_user.name
+  policy_arn = aws_iam_policy.s3_folder_kms_iam_policy.arn
 }
